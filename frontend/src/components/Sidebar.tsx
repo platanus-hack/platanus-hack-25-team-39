@@ -1,7 +1,6 @@
 import { LayoutDashboard, FileText, Search, Eye, Settings, X } from "lucide-react";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import logoLW from "@/assets/logo_lw.svg";
 
 const items = [
