@@ -1,0 +1,2 @@
+"""Conflict Detector app."""
+

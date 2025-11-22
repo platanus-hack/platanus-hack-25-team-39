@@ -1,4 +1,5 @@
 from apps.auditlog.api import router as auditlog_router
+from apps.conflict_detector.api import router as conflict_detector_router
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import admin
@@ -13,6 +14,7 @@ from ninja.security import SessionAuth
 ########################
 API_ROUTERS = [
     ("/auditlog", auditlog_router),
+    ("/conflict-detector", conflict_detector_router),
 ]
 
 # Configuration process guards against multiple
