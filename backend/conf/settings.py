@@ -4,6 +4,7 @@ Production-ready Django settings file.
 For local development, use .default file to override necessary settings.
 """
 
+import os
 from pathlib import Path
 
 import dj_database_url
@@ -14,6 +15,20 @@ from uncouple import Config, StringList
 #############################
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 APPS_DIR = BASE_DIR / "apps"
+
+# Load .env file manually to ensure decouple can find the variables
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    with open(_env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("'\"")  # Remove quotes if present
+                # Only set if not already in environment (env vars take precedence)
+                if key not in os.environ:
+                    os.environ[key] = value
 
 
 #############################
@@ -64,7 +79,10 @@ class EmailConfig(Config):
 
 class ProjectConfig(Config):
     """Project-specific configuration"""
+
+    OPENAI_API_KEY: str = ""
     ...
+
 
 # Load configurations
 django_config = DjangoConfig.load(prefix="DJANGO")
@@ -159,6 +177,7 @@ INSTALLED_APPS = [
     ############################
     "apps.users",
     "apps.auditlog",
+    "apps.conflict_detector",
 ]
 
 #############################
@@ -365,8 +384,13 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["X-Session-Token"]
 
 # Allow cookies to be sent cross-origin
-SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = False  # not DEBUG  # Require HTTPS in production
+# For cross-origin requests (frontend and backend on different domains), we need:
+# - SameSite=None (allows cross-origin cookies)
+# - Secure=True (required when SameSite=None)
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True  # Required for SameSite=None
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
 
 
 #############################
@@ -417,4 +441,4 @@ SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 #############################
 # PROJECT SPECIFIC SETTINGS
 #############################
-# MY_SETTING = project_config.MY_SETTING
+PROJECT_OPENAI_API_KEY = project_config.OPENAI_API_KEY
