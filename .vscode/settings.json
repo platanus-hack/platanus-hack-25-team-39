@@ -1,0 +1,37 @@
+{
+  // Python interpreter configuration
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  
+  // Python environment for the backend
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  
+  // Linting configuration (using Ruff as specified in pyproject.toml)
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.pylintEnabled": false,
+  
+  // Formatting with Ruff
+  "python.formatting.provider": "none",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  
+  // Language server settings
+  "python.languageServer": "None",
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  
+  // File associations
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  }
+}
+
