@@ -1,0 +1,75 @@
+#=========================================#
+#===== FRONTEND CONFIGURATION ============#
+#=========================================#
+VITE_PROXY_BACKEND_URL=http://backend:8000
+
+
+#=========================================#
+#===== BACKEND CONFIGURATION =============#
+#=========================================#
+DJANGO_SECRET_KEY=django-insecure-tryqw*8!=w%5%x7$)(st1h4aya*a#4-0$)0(5r6n(l$!v_y=jl
+DJANGO_ALLOWED_HOSTS=*
+# DJANGO_ADMINS=
+# DJANGO_MEDIA_URL=/media/
+
+# #############################
+# # TIMEZONE
+# #############################
+# DJANGO_TIME_ZONE=UTC
+
+# #############################
+# # DATABASE CONNECTION
+# #############################
+
+
+DJANGO_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/webapp
+
+# #############################
+# # AUTHENTICATION
+# #############################
+# DJANGO_AUTH_USER_MODEL=users.User
+# DJANGO_LOGIN_REDIRECT_URL=/
+# DJANGO_LOGIN_URL=/admin/login/
+
+# #############################
+# # SECURITY
+# #############################
+# DJANGO_SECURE_SSL_REDIRECT=False
+# DJANGO_SECURE_HSTS_SECONDS=0
+# DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+# DJANGO_SECURE_HSTS_PRELOAD=False
+# DJANGO_SECURE_CONTENT_TYPE_NOSNIFF=False
+
+# #############################
+# # EMAIL
+# #############################
+# EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+# EMAIL_HOST=localhost
+# EMAIL_PORT=1025
+# EMAIL_USE_TLS=False
+# EMAIL_HOST_USER=
+# EMAIL_HOST_PASSWORD=
+# DEFAULT_FROM_EMAIL=webmaster@localhost
+# SERVER_EMAIL=webmaster@localhost
+# EMAIL_SUBJECT_PREFIX=[Django Local]
+
+# #############################
+# # LOGGING
+# #############################
+DJANGO_LOG_LEVEL=DEBUG
+
+# #############################
+# # AUDIT LOG
+# #############################
+# # Whitelist is automatically disabled in development (DEBUG=True)
+# # Set to False to explicitly disable whitelist
+# # AUDITLOG_WHITELIST_ENABLED=False
+
+
+#=========================================#
+#===== POSTGRES CONFIGURATION =============#
+#=========================================#
+POSTGRES_PORT=5432
+POSTGRES_DB=webapp
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
