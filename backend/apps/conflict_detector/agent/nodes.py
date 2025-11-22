@@ -1,19 +1,22 @@
 """Nodos del grafo del agente de detección de conflictos."""
 
 import json
-import os
 import time
 from pathlib import Path
 
 import numpy as np
+from django.conf import settings
 from openai import OpenAI
 
-from .models import ConflictoDetectado, ImpactoConflicto, ProyectoLey, ProyectoLeyImpacto
-from .prompts import MAP_EXTRACCION_MATRICES, CONSOLIDACION_DESCRIPCIONES
-from .state import ConflictDetectorState
-from django.conf import settings
 from .llm_map import llm_map
-
+from .models import (
+    ConflictoDetectado,
+    ImpactoConflicto,
+    ProyectoLey,
+    ProyectoLeyImpacto,
+)
+from .prompts import CONSOLIDACION_DESCRIPCIONES, MAP_EXTRACCION_MATRICES
+from .state import ConflictDetectorState
 
 # Variables globales de configuración
 SIMILITUD_THRESHOLD = 0.4
@@ -63,7 +66,7 @@ def generar_embeddings(textos: list[str], batch_size: int = 100) -> list[list[fl
     # Filtrar y validar textos antes de procesar
     textos_validos = []
     indices_validos = []
-    
+
     for idx, texto in enumerate(textos):
         # Validar que el texto sea string, no None, y no esté vacío
         if isinstance(texto, str) and texto.strip():
@@ -91,7 +94,7 @@ def generar_embeddings(textos: list[str], batch_size: int = 100) -> list[list[fl
             time.sleep(0.1)
 
         except Exception as e:
-            print(f"Error al procesar lote {i//batch_size + 1}: {e}")
+            print(f"Error al procesar lote {i // batch_size + 1}: {e}")
             raise
 
     return embeddings
@@ -154,13 +157,15 @@ def detectar_conflictos(
         if isinstance(pagina, str) and pagina.strip():
             paginas_validas.append(pagina)
             indices_paginas_validas.append(idx)
-    
+
     if not paginas_validas:
         print("No hay páginas válidas para procesar")
         return []
 
     # Generar embeddings para páginas válidas
-    print(f"Generando embeddings para {len(paginas_validas)} páginas válidas (de {len(document_pages)} totales)...")
+    print(
+        f"Generando embeddings para {len(paginas_validas)} páginas válidas (de {len(document_pages)} totales)..."
+    )
     embeddings_paginas = generar_embeddings(paginas_validas)
     embeddings_paginas_np = np.array(embeddings_paginas)
     print("embeddings_paginas_np: ", embeddings_paginas_np)
@@ -173,11 +178,11 @@ def detectar_conflictos(
         # Filtrar artículos con descripcion_semantica vacía o inválida
         textos_articulos.append(desc_sem)
         articulos_validos.append(item)
-    
+
     if not textos_articulos:
         print("No hay artículos válidos para procesar")
         return []
-    
+
     print(f"Generando embeddings para {len(textos_articulos)} artículos...")
     embeddings_articulos = generar_embeddings(textos_articulos)
     embeddings_articulos_np = np.array(embeddings_articulos)
@@ -204,12 +209,14 @@ def detectar_conflictos(
                     }
                 )
             else:
-                print({
+                print(
+                    {
                         "proyecto_id": item["proyecto_id"],
                         "proyecto_titulo": item["proyecto_titulo"],
                         "articulo": item["articulo"],
                         "similitud": similitud,
-                    })
+                    }
+                )
 
         # Ordenar por similitud descendente
         similitudes_articulos.sort(key=lambda x: x["similitud"], reverse=True)
@@ -244,51 +251,46 @@ def consolidate_descriptions(descriptions: list[str]) -> str:
     """
     if not descriptions:
         return ""
-    
+
     if len(descriptions) == 1:
         return descriptions[0]
-    
+
     # Formatear descripciones numeradas para el prompt
     formatted_descriptions = "\n\n".join(
-        f"## Impacto {i+1}\n{desc}" 
-        for i, desc in enumerate(descriptions)
+        f"## Impacto {i + 1}\n{desc}" for i, desc in enumerate(descriptions)
     )
-    
+
     # Preparar el prompt con las descripciones
     prompt_content = CONSOLIDACION_DESCRIPCIONES.format(
         descriptions=formatted_descriptions
     )
-    
+
     # Llamar al LLM para consolidar
     client = get_openai_client()
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un abogado senior especializado en análisis regulatorio corporativo."
+                    "content": "Eres un abogado senior especializado en análisis regulatorio corporativo.",
                 },
-                {
-                    "role": "user",
-                    "content": prompt_content
-                }
+                {"role": "user", "content": prompt_content},
             ],
             temperature=0.3,
             max_tokens=2000,
         )
-        
+
         consolidated = response.choices[0].message.content.strip()
         print(f"✅ Consolidadas {len(descriptions)} descripciones de impacto")
         return consolidated
-        
+
     except Exception as e:
         print(f"❌ Error al consolidar descripciones: {e}")
         # Fallback: concatenar descripciones con separadores
         return "\n\n---\n\n".join(
-            f"**Impacto {i+1}**\n\n{desc}" 
-            for i, desc in enumerate(descriptions)
+            f"**Impacto {i + 1}**\n\n{desc}" for i, desc in enumerate(descriptions)
         )
 
 
@@ -304,6 +306,7 @@ def calcular_impacto_conflictos(conflictos: list[ConflictoDetectado]):
     """
     if not conflictos:
         from .llm_map import MapResult
+
         return MapResult(map_results=[])
 
     # Convertir conflictos a strings usando __str__
@@ -320,6 +323,7 @@ def calcular_impacto_conflictos(conflictos: list[ConflictoDetectado]):
     print(f"✅ Impacto calculado para {len(result.map_results)} conflictos")
 
     return result
+
 
 def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
     """
@@ -347,7 +351,7 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
     print("articulos_con_proyecto: ", articulos_con_proyecto)
     # Detectar conflictos
     conflictos = detectar_conflictos(document_pages, articulos_con_proyecto)
-    
+
     # Calcular impacto de los conflictos usando LLM
     print("conflictos: ", conflictos)
     conflictos_impacto = calcular_impacto_conflictos(conflictos)
@@ -357,11 +361,11 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
     proyecto_ley_impacto = None
     print("conflictos: ", conflictos)
     print("conflictos_impacto.map_results: ", conflictos_impacto.map_results)
-    
+
     if conflictos and conflictos_impacto.map_results:
         # Crear un diccionario para agrupar impactos por proyecto
         proyectos_impacto = {}
-        
+
         # Combinar cada conflicto con su impacto correspondiente
         for conflicto, impacto in zip(conflictos, conflictos_impacto.map_results):
             print("conflicto.proyecto_id: ", conflicto.proyecto_id)
@@ -369,16 +373,16 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
             print("impacto: ", impacto)
             proyecto_id = conflicto.proyecto_id
             proyecto_titulo = conflicto.proyecto_titulo
-            
+
             if proyecto_id not in proyectos_impacto:
                 proyectos_impacto[proyecto_id] = {
                     "proyecto_id": proyecto_id,
                     "proyecto_titulo": proyecto_titulo,
-                    "impactos": []
+                    "impactos": [],
                 }
-            
+
             proyectos_impacto[proyecto_id]["impactos"].append(impacto)
-        
+
         # Si hay al menos un proyecto, usar el primero (o podríamos retornar una lista)
         print("proyectos_impacto: ", proyectos_impacto)
         all_descriptions = []
@@ -397,9 +401,8 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
         print("all_descriptions: ", all_descriptions)
         description = consolidate_descriptions(all_descriptions)
 
-
     # Actualizar el estado
-    #state.proyectos_ley = proyectos_ley
+    # state.proyectos_ley = proyectos_ley
     ##state.conflictos = conflictos
     state.proyecto_ley_impacto = proyecto_ley_impacto
     state.descripcion_impacto_consolidada = description

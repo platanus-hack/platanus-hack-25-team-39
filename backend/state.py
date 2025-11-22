@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from .models import Articulo, ConflictoDetectado, ProyectoLey, ProyectoLeyImpacto
+from .models import ConflictoDetectado, ProyectoLey, ProyectoLeyImpacto
 
 
 class ConflictDetectorState(BaseModel):
@@ -14,5 +14,3 @@ class ConflictDetectorState(BaseModel):
     conflictos: list[ConflictoDetectado] = []
     proyecto_ley_impacto: ProyectoLeyImpacto | None = None
     descripcion_impacto_consolidada: str | None = None
-
-

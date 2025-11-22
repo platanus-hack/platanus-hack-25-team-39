@@ -71,4 +71,3 @@ def run_agent(document_pages: list[str]) -> dict:
     print("result: ", result)
 
     return result
-

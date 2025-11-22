@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from django.conf import settings
 
 # Type variable for Pydantic models
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class MapResult(NamedTuple):
@@ -79,8 +79,8 @@ def _llm_map(
         chain = map_prompt | llm | map_output_parser
 
     outputs = chain.batch(
-        [{'item': d} for d in texts],
-        config={'max_concurrency': concurrency_limit},
+        [{"item": d} for d in texts],
+        config={"max_concurrency": concurrency_limit},
     )
 
     return outputs
@@ -92,7 +92,7 @@ def llm_map(
     map_output_parser: type[BaseModel] | None | list[type[BaseModel] | None] = None,
     *,
     llm: Runnable | None = None,
-    llm_model: str = 'gpt-4o-mini',
+    llm_model: str = "gpt-4o-mini",
     llm_temperature: float = 0.1,
     openai_api_key: str = settings.PROJECT_OPENAI_API_KEY,
     concurrency_limit: int = 16,
@@ -145,7 +145,7 @@ def llm_map(
         return MapResult(map_results=[])
 
     if map_prompt is None:
-        raise ValueError('map_prompt cannot be None')
+        raise ValueError("map_prompt cannot be None")
 
     # Normalize inputs to list format for unified processing
     map_prompts = map_prompt if isinstance(map_prompt, list) else [map_prompt]
@@ -156,8 +156,8 @@ def llm_map(
     elif isinstance(map_output_parser, list):
         if len(map_output_parser) != len(map_prompts):
             raise ValueError(
-                f'Number of parsers ({len(map_output_parser)}) must match '
-                f'number of prompts ({len(map_prompts)})'
+                f"Number of parsers ({len(map_output_parser)}) must match "
+                f"number of prompts ({len(map_prompts)})"
             )
         map_parsers = map_output_parser
     else:
@@ -187,7 +187,9 @@ def llm_map(
 
         # Prepare results for next step (convert to strings except for final step)
         current_results = (
-            [str(result) for result in step_results] if i < len(map_prompts) - 1 else step_results
+            [str(result) for result in step_results]
+            if i < len(map_prompts) - 1
+            else step_results
         )
 
     return MapResult(map_results=current_results)

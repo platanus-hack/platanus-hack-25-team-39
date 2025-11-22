@@ -42,4 +42,3 @@ async def detect_conflicts(pdf_content: bytes) -> dict:
     # Ejecutar el agente de forma asíncrona usando sync_to_async
     result = await sync_to_async(run_agent)(document_pages)
     return result
-
