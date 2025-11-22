@@ -1,138 +1,99 @@
-import {
-  Box,
-  Flex,
-  Button,
-  Text,
-  Avatar,
-  Separator,
-  ScrollArea,
-  Popover,
-} from "@seisveinte/react";
-import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
-import { useAuth } from "../services/auth";
+import { LayoutDashboard, FileText, Search, Eye, Settings, X } from "lucide-react";
+import { Link, useMatchRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import logoLW from "@/assets/logo_lw.svg";
 
-interface SidebarProps {
-  userEmail: string;
-}
+const items = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Documentos", url: "/documents", icon: FileText },
+  { title: "Descubrimientos", url: "/discoveries", icon: Search },
+  { title: "Seguimiento", url: "/tracking", icon: Eye },
+  { title: "Configuración", url: "/settings", icon: Settings },
+];
 
-export function Sidebar({ userEmail }: SidebarProps) {
-  const { logout } = useAuth();
+export function Sidebar() {
+  const [isOpen, setIsOpen] = useState(true);
   const matchRoute = useMatchRoute();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await logout?.();
-      navigate({ to: "/login" });
-    } catch (err) {
-      console.error("Error logging out:", err);
-    }
-  };
-
-  // Helper to check if route is active
-  const isActive = (path: string, fuzzy?: boolean) => {
-    return !!matchRoute({ to: path, fuzzy });
-  };
 
   return (
-    <Box
-      style={{
-        width: "250px",
-        height: "100vh",
-        borderRight: "1px solid var(--gray-a5)",
-        backgroundColor: "var(--color-panel)",
-        position: "fixed",
-        left: 0,
-        top: 0,
-      }}
-    >
-      <Flex direction="column" style={{ height: "100%" }}>
-        {/* Header/Logo */}
-
-        {/* TODO: Add header/logo */}
+    <>
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-screen bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))] transition-all duration-300 z-40",
+          isOpen ? "w-64" : "w-16"
+        )}
+      >
+        {/* Header */}
+        <div className="h-16 flex items-center px-4 border-b border-[hsl(var(--sidebar-border))]">
+          {isOpen ? (
+            <>
+              <div className="flex items-center gap-2 flex-1">
+                <h1 className="font-bold text-2xl">LegalWard</h1>
+                <div className="h-10 w-10 overflow-hidden flex items-center justify-center flex-shrink-0 mb-2.5">
+                  <img
+                    src={logoLW}
+                    alt="LegalWard Logo"
+                    className="h-10 w-10 object-contain"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 hover:bg-[hsl(var(--sidebar-accent))] rounded-md transition-colors flex-shrink-0"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center justify-center w-full">
+              <div className="h-10 w-10 overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setIsOpen(true)}>
+                <img
+                  src={logoLW}
+                  alt="LegalWard Logo"
+                  className="h-10 w-10 object-contain"
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Navigation */}
-        <ScrollArea style={{ flex: 1 }}>
-          <Flex direction="column" gap="2" p="3">
-            <Link to="/">
-              <Button
-                variant={isActive("/") ? "soft" : "ghost"}
-                style={{ justifyContent: "flex-start", width: "100%" }}
-              >
-                Home
-              </Button>
-            </Link>
-            <Link to="/tab2">
-              <Button
-                variant={isActive("/tab2") ? "soft" : "ghost"}
-                style={{ justifyContent: "flex-start", width: "100%" }}
-              >
-                Tab 2
-              </Button>
-            </Link>
-            <Link to="/tab3">
-              <Button
-                variant={isActive("/tab3") ? "soft" : "ghost"}
-                style={{ justifyContent: "flex-start", width: "100%" }}
-              >
-                Tab 3
-              </Button>
-            </Link>
-          </Flex>
-        </ScrollArea>
+        <nav className="mt-4 px-2">
+          {isOpen && (
+            <p className="px-3 mb-2 text-xs font-medium text-[hsl(var(--sidebar-foreground))] opacity-60">
+              Navegación
+            </p>
+          )}
+          <ul className="space-y-1">
+            {items.map((item) => {
+              const isActive = !!matchRoute({ to: item.url, fuzzy: false });
+              const Icon = item.icon;
 
-        <Separator size="4" />
-
-        {/* User Profile */}
-        <Box p="3">
-          <Popover.Root>
-            <Popover.Trigger>
-              <Flex gap="3" align="center" style={{ cursor: "pointer" }}>
-                <Avatar
-                  size="2"
-                  fallback={userEmail.charAt(0).toUpperCase()}
-                  radius="full"
-                />
-                <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">
-                    {userEmail.split("@")[0]}
-                  </Text>
-                  <Text size="1" color="gray">
-                    {userEmail}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Popover.Trigger>
-            <Popover.Content style={{ width: "200px" }}>
-              <Flex direction="column" gap="2">
-                <Link to="/profile">
-                  <Button
-                    variant="ghost"
-                    style={{ justifyContent: "flex-start", width: "100%" }}
+              return (
+                <li key={item.title}>
+                  <Link
+                    to={item.url}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                      isActive
+                        ? "bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-accent-foreground))]"
+                        : "hover:bg-[hsl(var(--sidebar-accent))]/50"
+                    )}
                   >
-                    Profile
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  style={{ justifyContent: "flex-start" }}
-                >
-                  Settings
-                </Button>
-                <Separator size="4" />
-                <Button
-                  variant="ghost"
-                  color="red"
-                  style={{ justifyContent: "flex-start" }}
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Button>
-              </Flex>
-            </Popover.Content>
-          </Popover.Root>
-        </Box>
-      </Flex>
-    </Box>
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    {isOpen && <span>{item.title}</span>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
+
+      {/* Spacer */}
+      <div className={cn("transition-all duration-300", isOpen ? "w-64" : "w-16")} />
+    </>
   );
 }
