@@ -1,0 +1,18 @@
+{
+  "id": "16932-01",
+  "titulo": "Modifica la ley N° 18.450, que aprueba normas para el fomento de la inversión privada de obras de riego y drenaje, para facilitar su aplicación en casos de catástrofes y emergencias",
+  "camara_origen": "Cámara de Diputados",
+  "tipo_proyecto": "Proyecto de Ley",
+  "etapa": 1,
+  "urgencia_actual": "Sin urgencia",
+  "fecha": "2025-07-23",
+  "articulos": [
+    {
+      "numero": 1,
+      "tipo": "permanente",
+      "texto": "Artículo único.- Sustitúyese el inciso final del artículo 3 de la ley N° 18.450, que Aprueba normas para el fomento de la inversión privada en obras de riego y drenaje, por los siguientes incisos cuarto, quinto, sexto y séptimo, nuevos: 'En caso de situaciones excepcionales de escasez hídrica o en las que se haya producido daño a la infraestructura de riego o afectado su funcionamiento, por las que el Presidente de la República haya decretado estado de excepción constitucional de catástrofe, o en su defecto, declarado una o más zonas afectadas por sismos o catástrofes de conformidad con lo dispuesto en el decreto N° 104, de 1977, del Ministerio del Interior, que fijó el texto refundido, coordinado y sistematizado del Título I de la ley N° 16.282, la comisión podrá establecer mecanismos y exigencias distintas de las señaladas en la presente ley o en su reglamento, con la finalidad de atenuar los efectos de la catástrofe.",
+      "descripcion_semantica": "Modificación de ley de fomento de inversión privada en obras de riego y drenaje para facilitar aplicación en situaciones excepcionales de catástrofe o emergencia hídrica"
+    }
+  ]
+}
+

@@ -22,16 +22,18 @@ Realiza un análisis comparativo detallado para determinar:
 
 1. **Identificación de Conflicto**: ¿Existe contradicción, obligación nueva, o impacto directo entre el artículo propuesto y las prácticas/políticas descritas en la memoria?
 
-2. **Extracción de Textos Relevantes**: 
-   - Del documento interno: extrae ÚNICAMENTE las frases o párrafos específicos que se relacionan con el artículo
-   - Del artículo de ley: extrae ÚNICAMENTE la porción del texto legal que genera el impacto
-   
-3. **Evaluación de Relevancia**: Asigna un score 0-100 considerando:
-   - 0-20: Sin impacto o irrelevante
+2. **Evaluación de Relevancia**: Primero determina si existe una relación real entre los documentos. Asigna un score 0-100:
+   - 0: SIN RELACIÓN - No existe conexión temática ni impacto entre los documentos
+   - 1-20: Relación tangencial o irrelevante
    - 21-40: Impacto menor, informativo
    - 41-60: Impacto moderado, requiere revisión
    - 61-80: Impacto significativo, requiere acción
    - 81-100: Impacto crítico, requiere atención inmediata
+
+3. **Extracción de Textos Relevantes** (solo si nivel_relevancia > 0):
+   - Del documento interno: extrae ÚNICAMENTE las frases o párrafos específicos que se relacionan con el artículo
+   - Del artículo de ley: extrae ÚNICAMENTE la porción del texto legal que genera el impacto
+   - Si nivel_relevancia = 0, puedes usar "Sin relación identificada" en ambos campos
 
 4. **Análisis Técnico-Legal**: Redacta un análisis que incluya:
    - Naturaleza del conflicto o discrepancia identificada
@@ -49,43 +51,187 @@ Realiza un análisis comparativo detallado para determinar:
 # OUTPUT ESPERADO
 
 Proporciona tu análisis en formato estructurado que incluya:
-- extracto_interno: Solo el texto pertinente del documento interno
-- extracto_articulo: Solo la porción relevante del artículo de ley
-- nivel_relevancia: Score numérico entre 0-100
-- descripcion_impacto: Análisis técnico-legal del impacto identificado
+- nivel_relevancia: Score numérico entre 0-100 (usa 0 si NO hay relación justificable)
+- extracto_interno: Texto pertinente del documento interno (o "Sin relación identificada" si nivel_relevancia = 0)
+- extracto_articulo: Porción relevante del artículo de ley (o "Sin relación identificada" si nivel_relevancia = 0)
+- descripcion_impacto: Análisis técnico-legal del impacto, o explicación de por qué no hay relación
 
-Si NO existe impacto o relación relevante entre los documentos, asigna nivel_relevancia < 20 y explica brevemente por qué no hay conflicto."""
+IMPORTANTE: Si tras analizar ambos documentos NO encuentras una relación directa y justificable entre ellos, asigna nivel_relevancia = 0. Es preferible descartar correctamente una comparación sin relación que forzar un impacto inexistente."""
 )  # noqa: E501
 
-CONSOLIDACION_DESCRIPCIONES = """# ROL Y EXPERTISE
-Eres un abogado senior especializado en síntesis de análisis regulatorio. Tu función es consolidar múltiples análisis de impacto en un reporte ejecutivo coherente.
+# String template for consolidation (used in legacy sequential calls)
+CONSOLIDACION_DESCRIPCIONES = """# ROL
+Eres un abogado corporativo que sintetiza análisis de impacto regulatorio.
 
 # CONTEXTO
-Se te proporcionarán múltiples descripciones de impacto que analizan cómo diferentes artículos de un proyecto de ley afectan a una empresa. Estas descripciones pueden:
-- Abordar aspectos similares desde distintos ángulos
-- Contener redundancias o repeticiones
-- Referirse a distintas áreas operativas o de cumplimiento
+Se analizó cómo un proyecto de ley afecta a una empresa. Tienes múltiples descripciones de impacto que pueden tener redundancias.
 
-# TAREA
-Consolida las siguientes descripciones de impacto en un análisis único, estructurado y coherente:
+# DESCRIPCIONES A CONSOLIDAR
 
 {descriptions}
 
-# CRITERIOS DE CONSOLIDACIÓN
+# INSTRUCCIONES
 
-1. **Eliminación de Redundancias**: Identifica y fusiona información repetida o similar
-2. **Estructura Lógica**: Organiza el análisis por temas/áreas (ej: cumplimiento, operaciones, riesgos legales)
-3. **Jerarquización**: Destaca impactos críticos antes que moderados
-4. **Coherencia**: Asegura transiciones fluidas entre distintos puntos de análisis
-5. **Completitud**: Mantén todos los puntos sustanciales de las descripciones originales
+Consolida en un reporte único eliminando redundancias. Usa el siguiente formato markdown EXACTO:
 
-# ESTRUCTURA RECOMENDADA
+## Resumen
 
-1. **Resumen Ejecutivo**: 2-3 líneas con los impactos principales
-2. **Análisis por Áreas**: Agrupa impactos relacionados (cumplimiento, operaciones, financiero, etc.)
-3. **Riesgos Identificados**: Consolidación de riesgos legales y sanciones potenciales
-4. **Consideraciones Finales**: Implicaciones generales o recomendaciones de alto nivel
+[2-3 oraciones sobre el impacto general del proyecto de ley en la empresa]
 
-# OUTPUT ESPERADO
+## Impactos Identificados
 
-Un texto consolidado en español, técnico-legal, estructurado con markdown (headers, bullets), de extensión proporcional al número de impactos (máximo 800 palabras). Mantén un tono profesional apropiado para un equipo legal corporativo."""  # noqa: E501
+- **[Tema 1]**: [Descripción del impacto]
+- **[Tema 2]**: [Descripción del impacto]
+- **[Tema N]**: [Descripción del impacto]
+
+## Riesgos
+
+- [Riesgo 1 con posibles consecuencias]
+- [Riesgo 2 con posibles consecuencias]
+
+## Acciones Sugeridas
+
+- [Acción concreta 1]
+- [Acción concreta 2]
+
+# REGLAS
+
+- Usa bullet points (-) para listar items
+- Usa **negrita** para destacar temas clave
+- Sé conciso y directo (máximo 500 palabras)
+- Lenguaje técnico-legal pero claro
+- Si no hay riesgos significativos, omite esa sección"""  # noqa: E501
+
+# ChatPromptTemplate for llm_map parallel consolidation
+MAP_CONSOLIDACION_DESCRIPCIONES = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Eres un abogado senior especializado en análisis regulatorio corporativo.",
+        ),
+        (
+            "user",
+            """# ROL
+Eres un abogado corporativo que sintetiza análisis de impacto regulatorio.
+
+# CONTEXTO
+Se analizó cómo un proyecto de ley afecta a una empresa. Tienes múltiples descripciones de impacto que pueden tener redundancias.
+
+# DESCRIPCIONES A CONSOLIDAR
+
+{item}
+
+# INSTRUCCIONES
+
+Consolida en un reporte único eliminando redundancias. Usa el siguiente formato markdown EXACTO:
+
+## Resumen
+
+[2-3 oraciones sobre el impacto general del proyecto de ley en la empresa]
+
+## Impactos Identificados
+
+- **[Tema 1]**: [Descripción del impacto]
+- **[Tema 2]**: [Descripción del impacto]
+- **[Tema N]**: [Descripción del impacto]
+
+## Riesgos
+
+- [Riesgo 1 con posibles consecuencias]
+- [Riesgo 2 con posibles consecuencias]
+
+## Acciones Sugeridas
+
+- [Acción concreta 1]
+- [Acción concreta 2]
+
+# REGLAS
+
+- Usa bullet points (-) para listar items
+- Usa **negrita** para destacar temas clave
+- Sé conciso y directo (máximo 500 palabras)
+- Lenguaje técnico-legal pero claro
+- Si no hay riesgos significativos, omite esa sección""",
+        ),
+    ]
+)
+
+CONSOLIDACION_BAJA_RELEVANCIA = """# ROL
+Eres un abogado corporativo que analiza por qué ciertos impactos regulatorios no son significativos.
+
+# CONTEXTO
+Se analizó cómo un proyecto de ley afecta a una empresa. Los impactos detectados tienen baja relevancia (menos de 50/100). Tu tarea es explicar por qué estos impactos no requieren atención inmediata.
+
+# IMPACTOS ANALIZADOS
+
+{descriptions}
+
+# INSTRUCCIONES
+
+Genera un resumen breve explicando por qué estos impactos no son significativos. Usa el siguiente formato markdown:
+
+## Resumen
+
+[2-3 oraciones indicando que el proyecto de ley tiene impacto limitado o bajo en la empresa]
+
+## Análisis de Relevancia
+
+- **[Tema 1]**: [Por qué no es significativo]
+- **[Tema 2]**: [Por qué no es significativo]
+
+## Conclusión
+
+[1-2 oraciones recomendando monitoreo pasivo o indicando que no se requiere acción]
+
+# REGLAS
+
+- Sé conciso (máximo 300 palabras)
+- Explica claramente por qué cada impacto es de baja relevancia
+- Tono tranquilizador pero profesional
+- No inventes riesgos que no existen"""  # noqa: E501
+
+# ChatPromptTemplate for llm_map parallel low relevance consolidation
+MAP_CONSOLIDACION_BAJA_RELEVANCIA = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Eres un abogado corporativo que explica análisis regulatorio.",
+        ),
+        (
+            "user",
+            """# ROL
+Eres un abogado corporativo que analiza por qué ciertos impactos regulatorios no son significativos.
+
+# CONTEXTO
+Se analizó cómo un proyecto de ley afecta a una empresa. Los impactos detectados tienen baja relevancia (menos de 50/100). Tu tarea es explicar por qué estos impactos no requieren atención inmediata.
+
+# IMPACTOS ANALIZADOS
+
+{item}
+
+# INSTRUCCIONES
+
+Genera un resumen breve explicando por qué estos impactos no son significativos. Usa el siguiente formato markdown:
+
+## Resumen
+
+[2-3 oraciones indicando que el proyecto de ley tiene impacto limitado o bajo en la empresa]
+
+## Análisis de Relevancia
+
+- **[Tema 1]**: [Por qué no es significativo]
+- **[Tema 2]**: [Por qué no es significativo]
+
+## Conclusión
+
+[1-2 oraciones recomendando monitoreo pasivo o indicando que no se requiere acción]
+
+# REGLAS
+
+- Sé conciso (máximo 300 palabras)
+- Explica claramente por qué cada impacto es de baja relevancia
+- Tono tranquilizador pero profesional
+- No inventes riesgos que no existen""",
+        ),
+    ]
+)

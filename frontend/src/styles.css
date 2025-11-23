@@ -129,3 +129,36 @@ All colors MUST be HSL.
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
   }
 }
+
+/* Markdown content styles */
+.markdown-content {
+  @apply text-[hsl(var(--foreground))] leading-relaxed;
+}
+
+.markdown-content h2 {
+  @apply text-lg font-semibold mt-6 mb-3 text-[hsl(var(--foreground))] border-b border-[hsl(var(--border))] pb-2;
+}
+
+.markdown-content h3 {
+  @apply text-base font-medium mt-4 mb-2 text-[hsl(var(--foreground))];
+}
+
+.markdown-content p {
+  @apply mb-3 text-sm;
+}
+
+.markdown-content ul {
+  @apply list-disc list-outside ml-5 mb-4 space-y-2;
+}
+
+.markdown-content li {
+  @apply text-sm text-[hsl(var(--muted-foreground))];
+}
+
+.markdown-content li strong {
+  @apply text-[hsl(var(--foreground))] font-medium;
+}
+
+.markdown-content strong {
+  @apply font-semibold text-[hsl(var(--foreground))];
+}

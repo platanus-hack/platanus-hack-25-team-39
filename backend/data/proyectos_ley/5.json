@@ -1,0 +1,18 @@
+{
+  "id": "17151-33",
+  "titulo": "Prorroga el plazo establecido en la ley N° 21.435 para la inscripción y registro de derechos de aprovechamiento de aguas",
+  "camara_origen": "Cámara de Diputados",
+  "tipo_proyecto": "Proyecto de Ley",
+  "etapa": 1,
+  "urgencia_actual": "Sin urgencia",
+  "fecha": "2025-01-22",
+  "articulos": [
+    {
+      "numero": 1,
+      "tipo": "transitorio",
+      "texto": "Artículo único.- Modifícase el artículo segundo transitorio de la ley N° 21.435, que reforma el Código de Aguas, de la siguiente manera: 1. Reemplázase en el inciso primero la expresión '6 de abril de 2025', por '6 de abril de 2027'. 2. Sustitúyese en el inciso tercero la frase 'y acompañará, para cada caso, copia del certificado de dominio vigente y de la inscripción en el registro'.",
+      "descripcion_semantica": "Prórroga de plazo para inscripción de derechos de aprovechamiento de aguas desde abril 2025 a abril 2027 y modificación de requisitos de documentación"
+    }
+  ]
+}
+

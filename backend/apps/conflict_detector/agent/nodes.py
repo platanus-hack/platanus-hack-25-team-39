@@ -1,8 +1,7 @@
 """Nodos del grafo del agente de detección de conflictos."""
 
-import json
-import time
-from pathlib import Path
+import hashlib
+import logging
 
 import numpy as np
 from django.conf import settings
@@ -12,14 +11,21 @@ from .llm_map import llm_map
 from .models import (
     ConflictoDetectado,
     ImpactoConflicto,
+    ImpactoConflictoLLM,
     ProyectoLey,
     ProyectoLeyImpacto,
 )
-from .prompts import CONSOLIDACION_DESCRIPCIONES, MAP_EXTRACCION_MATRICES
+from .prompts import (
+    MAP_CONSOLIDACION_BAJA_RELEVANCIA,
+    MAP_CONSOLIDACION_DESCRIPCIONES,
+    MAP_EXTRACCION_MATRICES,
+)
 from .state import ConflictDetectorState
 
+logger = logging.getLogger(__name__)
+
 # Variables globales de configuración
-SIMILITUD_THRESHOLD = 0.4
+SIMILITUD_THRESHOLD = 0.325
 MAX_ARTICULOS_POR_PAGINA = 10
 EMBEDDING_MODEL = "text-embedding-3-small"
 
@@ -29,7 +35,6 @@ _client = None
 
 def get_openai_client() -> OpenAI:
     """Obtiene o crea el cliente de OpenAI."""
-    print("settings.PROJECT_OPENAI_API_KEY: ", settings.PROJECT_OPENAI_API_KEY)
     global _client
     _client = OpenAI(api_key=settings.PROJECT_OPENAI_API_KEY)
     return _client
@@ -51,7 +56,7 @@ def similitud_coseno(vec1: np.ndarray, vec2: np.ndarray) -> float:
 
 def generar_embeddings(textos: list[str], batch_size: int = 100) -> list[list[float]]:
     """
-    Genera embeddings usando la API de OpenAI.
+    Genera embeddings usando la API de OpenAI con caché para evitar llamadas redundantes.
 
     Args:
         textos: Lista de textos a convertir en embeddings
@@ -60,8 +65,7 @@ def generar_embeddings(textos: list[str], batch_size: int = 100) -> list[list[fl
     Returns:
         Lista de vectores de embeddings
     """
-    client = get_openai_client()
-    embeddings = []
+    from apps.conflict_detector.models import EmbeddingCache
 
     # Filtrar y validar textos antes de procesar
     textos_validos = []
@@ -77,58 +81,151 @@ def generar_embeddings(textos: list[str], batch_size: int = 100) -> list[list[fl
             textos_validos.append(" ")
             indices_validos.append(idx)
 
-    # Procesar en lotes para manejar rate limits
-    for i in range(0, len(textos_validos), batch_size):
-        batch = textos_validos[i : i + batch_size]
+    # Calcular hashes para todos los textos
+    text_hashes = [
+        hashlib.sha256(texto.encode("utf-8")).hexdigest() for texto in textos_validos
+    ]
 
-        try:
-            response = client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=batch,
+    # Buscar embeddings en caché
+    logger.info(
+        f"Buscando {len(text_hashes)} hashes en caché (modelo: {EMBEDDING_MODEL})"
+    )
+    cached_embeddings = EmbeddingCache.objects.filter(
+        text_hash__in=text_hashes, model_name=EMBEDDING_MODEL
+    ).in_bulk(field_name="text_hash")
+    logger.info(f"Encontrados {len(cached_embeddings)} embeddings en caché")
+
+    # Identificar textos que necesitan generar embeddings
+    textos_to_generate = []
+    indices_to_generate = []
+    hash_to_index = {}
+
+    cache_hits = 0
+    cache_misses = 0
+    for idx, (texto, text_hash) in enumerate(zip(textos_validos, text_hashes)):
+        if text_hash in cached_embeddings:
+            # Ya está en caché
+            cache_hits += 1
+            hash_to_index[text_hash] = idx
+        else:
+            # Necesita generar embedding
+            cache_misses += 1
+            textos_to_generate.append(texto)
+            indices_to_generate.append(idx)
+            hash_to_index[text_hash] = idx
+
+    logger.info(f"Cache hits: {cache_hits}, Cache misses: {cache_misses}")
+
+    # Generar embeddings para textos no cacheados
+    nuevos_embeddings = {}
+    if textos_to_generate:
+        logger.info(
+            f"Generando {len(textos_to_generate)} embeddings nuevos "
+            f"({len(cached_embeddings)} encontrados en caché)"
+        )
+
+        client = get_openai_client()
+        nuevos_embeddings_list = []
+
+        # Procesar en lotes para manejar rate limits
+        for i in range(0, len(textos_to_generate), batch_size):
+            batch = textos_to_generate[i : i + batch_size]
+
+            try:
+                response = client.embeddings.create(
+                    model=EMBEDDING_MODEL,
+                    input=batch,
+                )
+
+                batch_embeddings = [item.embedding for item in response.data]
+                nuevos_embeddings_list.extend(batch_embeddings)
+
+            except Exception as e:
+                logger.error(f"Error al procesar lote {i // batch_size + 1}: {e}")
+                raise
+
+        # Guardar nuevos embeddings en caché
+        embeddings_to_cache = []
+        for idx, texto in enumerate(textos_to_generate):
+            text_hash = hashlib.sha256(texto.encode("utf-8")).hexdigest()
+            embedding = nuevos_embeddings_list[idx]
+
+            embeddings_to_cache.append(
+                EmbeddingCache(
+                    text_hash=text_hash,
+                    embedding=embedding,
+                    model_name=EMBEDDING_MODEL,
+                    dimension=len(embedding),
+                )
             )
+            nuevos_embeddings[text_hash] = embedding
 
-            batch_embeddings = [item.embedding for item in response.data]
-            embeddings.extend(batch_embeddings)
+        # Bulk insert de nuevos embeddings
+        if embeddings_to_cache:
+            EmbeddingCache.objects.bulk_create(
+                embeddings_to_cache, ignore_conflicts=True
+            )
+            logger.info(f"Guardados {len(embeddings_to_cache)} embeddings en caché")
+    else:
+        logger.info(
+            f"Todos los embeddings ({len(cached_embeddings)}) encontrados en caché"
+        )
 
-            # Pequeña pausa para evitar rate limits
-            time.sleep(0.1)
-
-        except Exception as e:
-            print(f"Error al procesar lote {i // batch_size + 1}: {e}")
-            raise
+    # Reconstruir lista de embeddings en el orden original
+    embeddings = []
+    for text_hash in text_hashes:
+        if text_hash in cached_embeddings:
+            # Obtener de caché
+            embeddings.append(list(cached_embeddings[text_hash].embedding))
+        else:
+            # Obtener de nuevos embeddings
+            embeddings.append(nuevos_embeddings[text_hash])
 
     return embeddings
 
 
 def load_proyectos_ley() -> list[ProyectoLey]:
     """
-    Carga los proyectos de ley desde los archivos JSON en data/proyectos_ley/.
+    Carga los proyectos de ley desde la base de datos.
 
     Returns:
-        Lista de proyectos de ley cargados
+        Lista de proyectos de ley cargados como modelos Pydantic
     """
+    from apps.proyectos_ley.models import ProyectoLey as ProyectoLeyDB
+
+    from .models import Articulo as ArticuloPydantic
+
     proyectos = []
-    # Buscar el directorio data/proyectos_ley desde la raíz del backend
-    # El path se construye desde el paquete hacia arriba hasta encontrar el backend
-    backend_root = Path(__file__).parent.parent.parent.parent
 
-    proyectos_dir = backend_root / "data" / "proyectos_ley"
-    print("proyectos_dir: ", proyectos_dir)
+    # Obtener todos los proyectos de ley con sus artículos
+    proyectos_db = ProyectoLeyDB.objects.prefetch_related("articulos").all()
 
-    if not proyectos_dir.exists():
-        return proyectos
+    for proyecto_db in proyectos_db:
+        # Convertir artículos de Django a Pydantic
+        articulos_pydantic = [
+            ArticuloPydantic(
+                numero=articulo.numero,
+                tipo=articulo.tipo,
+                texto=articulo.texto,
+                descripcion_semantica=articulo.descripcion_semantica,
+            )
+            for articulo in proyecto_db.articulos.all()
+        ]
 
-    for json_file in proyectos_dir.glob("*.json"):
-        try:
-            with open(json_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                proyecto = ProyectoLey(**data)
-                proyectos.append(proyecto)
-        except Exception as e:
-            # Si hay un error al cargar un archivo, lo ignoramos y continuamos
-            print(f"Error al cargar {json_file}: {e}")
-            continue
+        # Crear el modelo Pydantic del proyecto
+        proyecto = ProyectoLey(
+            id=proyecto_db.proyecto_id,
+            titulo=proyecto_db.titulo,
+            camara_origen=proyecto_db.camara_origen,
+            tipo_proyecto=proyecto_db.tipo_proyecto,
+            etapa=proyecto_db.etapa,
+            urgencia_actual=proyecto_db.urgencia_actual,
+            fecha=proyecto_db.fecha.isoformat(),
+            articulos=articulos_pydantic,
+        )
+        proyectos.append(proyecto)
 
+    logger.info(f"Cargados {len(proyectos)} proyectos de ley desde la base de datos")
     return proyectos
 
 
@@ -159,16 +256,15 @@ def detectar_conflictos(
             indices_paginas_validas.append(idx)
 
     if not paginas_validas:
-        print("No hay páginas válidas para procesar")
+        logger.warning("No hay páginas válidas para procesar")
         return []
 
     # Generar embeddings para páginas válidas
-    print(
-        f"Generando embeddings para {len(paginas_validas)} páginas válidas (de {len(document_pages)} totales)..."
+    logger.info(
+        f"Generando embeddings para {len(paginas_validas)} páginas válidas (de {len(document_pages)} totales)"
     )
     embeddings_paginas = generar_embeddings(paginas_validas)
     embeddings_paginas_np = np.array(embeddings_paginas)
-    print("embeddings_paginas_np: ", embeddings_paginas_np)
 
     # Generar embeddings para artículos (filtrar artículos con descripcion_semantica vacía)
     articulos_validos = []
@@ -180,13 +276,12 @@ def detectar_conflictos(
         articulos_validos.append(item)
 
     if not textos_articulos:
-        print("No hay artículos válidos para procesar")
+        logger.warning("No hay artículos válidos para procesar")
         return []
 
-    print(f"Generando embeddings para {len(textos_articulos)} artículos...")
+    logger.info(f"Generando embeddings para {len(textos_articulos)} artículos")
     embeddings_articulos = generar_embeddings(textos_articulos)
     embeddings_articulos_np = np.array(embeddings_articulos)
-    print("embeddings_articulos_np: ", embeddings_articulos_np)
     # Comparar cada página válida con cada artículo
     conflictos = []
 
@@ -201,15 +296,6 @@ def detectar_conflictos(
             similitud = similitud_coseno(embedding_pagina, embedding_articulo)
             if similitud >= SIMILITUD_THRESHOLD:
                 similitudes_articulos.append(
-                    {
-                        "proyecto_id": item["proyecto_id"],
-                        "proyecto_titulo": item["proyecto_titulo"],
-                        "articulo": item["articulo"],
-                        "similitud": similitud,
-                    }
-                )
-            else:
-                print(
                     {
                         "proyecto_id": item["proyecto_id"],
                         "proyecto_titulo": item["proyecto_titulo"],
@@ -235,63 +321,129 @@ def detectar_conflictos(
             )
             conflictos.append(conflicto)
 
-    print("conflictos: ", conflictos)
+    logger.info(f"Detectados {len(conflictos)} conflictos potenciales")
     return conflictos
 
 
-def consolidate_descriptions(descriptions: list[str]) -> str:
+def _format_descriptions_for_consolidation(descriptions: list[str]) -> str:
     """
-    Consolida múltiples descripciones de impacto en un análisis único y coherente.
+    Formatea una lista de descripciones para consolidación.
 
     Args:
-        descriptions: Lista de descripciones de impacto a consolidar
+        descriptions: Lista de descripciones de impacto
 
     Returns:
-        Descripción consolidada como string
+        String formateado con descripciones numeradas
     """
-    if not descriptions:
-        return ""
-
-    if len(descriptions) == 1:
-        return descriptions[0]
-
-    # Formatear descripciones numeradas para el prompt
-    formatted_descriptions = "\n\n".join(
+    return "\n\n".join(
         f"## Impacto {i + 1}\n{desc}" for i, desc in enumerate(descriptions)
     )
 
-    # Preparar el prompt con las descripciones
-    prompt_content = CONSOLIDACION_DESCRIPCIONES.format(
-        descriptions=formatted_descriptions
+
+def consolidate_descriptions_batch(
+    descriptions_list: list[list[str]],
+) -> list[str]:
+    """
+    Consolida múltiples listas de descripciones en paralelo usando llm_map.
+
+    Args:
+        descriptions_list: Lista de listas de descripciones a consolidar
+
+    Returns:
+        Lista de descripciones consolidadas
+    """
+    if not descriptions_list:
+        return []
+
+    # Preparar textos para procesar
+    texts_to_process: list[str] = []
+    indices_to_process: list[int] = []
+    results: list[str] = [""] * len(descriptions_list)
+
+    for idx, descriptions in enumerate(descriptions_list):
+        if not descriptions:
+            results[idx] = ""
+        elif len(descriptions) == 1:
+            results[idx] = descriptions[0]
+        else:
+            formatted = _format_descriptions_for_consolidation(descriptions)
+            texts_to_process.append(formatted)
+            indices_to_process.append(idx)
+
+    if not texts_to_process:
+        return results
+
+    # Usar llm_map para procesar en paralelo
+    logger.info(
+        f"Consolidando {len(texts_to_process)} grupos de descripciones en paralelo"
+    )
+    result = llm_map(
+        texts=texts_to_process,
+        map_prompt=MAP_CONSOLIDACION_DESCRIPCIONES,
+        map_output_parser=None,  # String output
+        llm_temperature=0.3,
+        concurrency_limit=32,
     )
 
-    # Llamar al LLM para consolidar
-    client = get_openai_client()
+    # Mapear resultados
+    for i, idx in enumerate(indices_to_process):
+        results[idx] = str(result.map_results[i])
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Eres un abogado senior especializado en análisis regulatorio corporativo.",
-                },
-                {"role": "user", "content": prompt_content},
-            ],
-            temperature=0.3,
-            max_tokens=2000,
-        )
+    logger.info(f"Consolidación completada para {len(texts_to_process)} grupos")
+    return results
 
-        consolidated = response.choices[0].message.content.strip()
-        print(f"✅ Consolidadas {len(descriptions)} descripciones de impacto")
-        return consolidated
 
-    except Exception as e:
-        print(f"❌ Error al consolidar descripciones: {e}")
-        # Fallback: concatenar descripciones con separadores
-        return "\n\n---\n\n".join(
-            f"**Impacto {i + 1}**\n\n{desc}" for i, desc in enumerate(descriptions)
-        )
+def consolidate_low_relevance_batch(
+    descriptions_list: list[list[str]],
+) -> list[str]:
+    """
+    Genera resúmenes de baja relevancia para múltiples listas en paralelo.
+
+    Args:
+        descriptions_list: Lista de listas de descripciones de baja relevancia
+
+    Returns:
+        Lista de resúmenes explicando por qué no son significativos
+    """
+    if not descriptions_list:
+        return []
+
+    # Preparar textos para procesar
+    texts_to_process: list[str] = []
+    indices_to_process: list[int] = []
+    results: list[str] = [""] * len(descriptions_list)
+
+    for idx, descriptions in enumerate(descriptions_list):
+        if not descriptions:
+            results[idx] = ""
+        else:
+            formatted = _format_descriptions_for_consolidation(descriptions)
+            texts_to_process.append(formatted)
+            indices_to_process.append(idx)
+
+    if not texts_to_process:
+        return results
+
+    # Usar llm_map para procesar en paralelo
+    logger.info(
+        f"Generando {len(texts_to_process)} resúmenes de baja relevancia en paralelo"
+    )
+    result = llm_map(
+        texts=texts_to_process,
+        map_prompt=MAP_CONSOLIDACION_BAJA_RELEVANCIA,
+        map_output_parser=None,  # String output
+        llm_temperature=0.3,
+        concurrency_limit=32,
+    )
+
+    # Mapear resultados
+    for i, idx in enumerate(indices_to_process):
+        results[idx] = str(result.map_results[i])
+
+    logger.info(
+        f"Resúmenes de baja relevancia completados para {len(texts_to_process)} grupos"
+    )
+    return results
 
 
 def calcular_impacto_conflictos(conflictos: list[ConflictoDetectado]):
@@ -312,15 +464,15 @@ def calcular_impacto_conflictos(conflictos: list[ConflictoDetectado]):
     # Convertir conflictos a strings usando __str__
     textos_para_procesar = [str(conflicto) for conflicto in conflictos]
 
-    # Usar llm_map para procesar los conflictos
+    # Usar llm_map para procesar los conflictos (usa ImpactoConflictoLLM para el LLM)
     result = llm_map(
         texts=textos_para_procesar,
         map_prompt=MAP_EXTRACCION_MATRICES,
-        map_output_parser=ImpactoConflicto,
-        concurrency_limit=16,
+        map_output_parser=ImpactoConflictoLLM,
+        concurrency_limit=128,
     )
 
-    print(f"✅ Impacto calculado para {len(result.map_results)} conflictos")
+    logger.info(f"Impacto calculado para {len(result.map_results)} conflictos")
 
     return result
 
@@ -332,11 +484,11 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
     Detecta conflictos comparando cada página con cada artículo.
     """
     document_pages = state.document_pages
-    print("document_pages: ", document_pages)
+    logger.info(f"Procesando documento con {len(document_pages)} páginas")
 
     # Cargar proyectos de ley
     proyectos_ley = load_proyectos_ley()
-    print("proyectos_ley: ", proyectos_ley)
+
     # Extraer artículos distintos
     articulos_con_proyecto = []
     for proyecto in proyectos_ley:
@@ -348,29 +500,35 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
                     "articulo": articulo,
                 }
             )
-    print("articulos_con_proyecto: ", articulos_con_proyecto)
+
+    logger.info(f"Total de artículos a comparar: {len(articulos_con_proyecto)}")
+
     # Detectar conflictos
     conflictos = detectar_conflictos(document_pages, articulos_con_proyecto)
 
     # Calcular impacto de los conflictos usando LLM
-    print("conflictos: ", conflictos)
     conflictos_impacto = calcular_impacto_conflictos(conflictos)
-    print("conflictos_impacto: ", conflictos_impacto)
 
     # Combinar conflictos originales con impactos calculados y agrupar por proyecto
-    proyecto_ley_impacto = None
-    print("conflictos: ", conflictos)
-    print("conflictos_impacto.map_results: ", conflictos_impacto.map_results)
+    proyectos_ley_impacto = []
 
     if conflictos and conflictos_impacto.map_results:
         # Crear un diccionario para agrupar impactos por proyecto
         proyectos_impacto = {}
 
         # Combinar cada conflicto con su impacto correspondiente
-        for conflicto, impacto in zip(conflictos, conflictos_impacto.map_results):
-            print("conflicto.proyecto_id: ", conflicto.proyecto_id)
-            print("conflicto.proyecto_titulo: ", conflicto.proyecto_titulo)
-            print("impacto: ", impacto)
+        impactos_sin_relacion_count = 0
+
+        for conflicto, impacto_llm in zip(conflictos, conflictos_impacto.map_results):
+            # Filtrar solo impactos donde el modelo indicó explícitamente sin relación
+            if impacto_llm.nivel_relevancia == 0:
+                logger.info(
+                    f"Impacto descartado (sin relación) - Proyecto: {conflicto.proyecto_id}, "
+                    f"Artículo: {conflicto.articulo_numero}"
+                )
+                impactos_sin_relacion_count += 1
+                continue
+
             proyecto_id = conflicto.proyecto_id
             proyecto_titulo = conflicto.proyecto_titulo
 
@@ -381,31 +539,102 @@ def process_document(state: ConflictDetectorState) -> ConflictDetectorState:
                     "impactos": [],
                 }
 
+            # Crear ImpactoConflicto con articulo_numero del conflicto
+            impacto = ImpactoConflicto(
+                articulo_numero=conflicto.articulo_numero,
+                extracto_interno=impacto_llm.extracto_interno,
+                extracto_articulo=impacto_llm.extracto_articulo,
+                nivel_relevancia=impacto_llm.nivel_relevancia,
+                descripcion_impacto=impacto_llm.descripcion_impacto,
+            )
             proyectos_impacto[proyecto_id]["impactos"].append(impacto)
 
-        # Si hay al menos un proyecto, usar el primero (o podríamos retornar una lista)
-        print("proyectos_impacto: ", proyectos_impacto)
-        all_descriptions = []
-        if proyectos_impacto:
-            primer_proyecto = next(iter(proyectos_impacto.values()))
-            proyecto_ley_impacto = ProyectoLeyImpacto(
-                proyecto_id=primer_proyecto["proyecto_id"],
-                proyecto_titulo=primer_proyecto["proyecto_titulo"],
-                impactos=primer_proyecto["impactos"],
+        if impactos_sin_relacion_count > 0:
+            logger.info(
+                f"Total de impactos descartados por baja relevancia: {impactos_sin_relacion_count}"
             )
-            for impacto in primer_proyecto["impactos"]:
-                if impacto.nivel_relevancia > 50:
-                    all_descriptions.append(impacto.descripcion_impacto)
+
+        # Construir lista de ProyectoLeyImpacto con consolidación paralela
+        proyectos_ley_impacto = []
+        if proyectos_impacto:
+            # Fase 1: Recopilar descripciones por proyecto
+            proyecto_ids = list(proyectos_impacto.keys())
+            high_relevance_by_project: list[list[str]] = []
+            low_relevance_by_project: list[list[str]] = []
+            max_relevancia_by_project: list[int] = []
+            use_high_relevance: list[bool] = []
+
+            for proyecto_id in proyecto_ids:
+                proyecto = proyectos_impacto[proyecto_id]
+                high_relevance_descriptions = []
+                low_relevance_descriptions = []
+                max_nivel_relevancia = 0
+
+                for impacto in proyecto["impactos"]:
+                    if impacto.nivel_relevancia > max_nivel_relevancia:
+                        max_nivel_relevancia = impacto.nivel_relevancia
+
+                    if impacto.nivel_relevancia > 50:
+                        high_relevance_descriptions.append(impacto.descripcion_impacto)
+                    else:
+                        low_relevance_descriptions.append(impacto.descripcion_impacto)
+
+                high_relevance_by_project.append(high_relevance_descriptions)
+                low_relevance_by_project.append(low_relevance_descriptions)
+                max_relevancia_by_project.append(max_nivel_relevancia)
+                use_high_relevance.append(len(high_relevance_descriptions) > 0)
+
+            # Fase 2: Consolidar en paralelo (separar high y low relevance)
+            high_to_consolidate = [
+                descs
+                for descs, use_high in zip(
+                    high_relevance_by_project, use_high_relevance
+                )
+                if use_high
+            ]
+            low_to_consolidate = [
+                descs
+                for descs, use_high in zip(low_relevance_by_project, use_high_relevance)
+                if not use_high
+            ]
+
+            # Ejecutar consolidaciones en paralelo
+            high_results = consolidate_descriptions_batch(high_to_consolidate)
+            low_results = consolidate_low_relevance_batch(low_to_consolidate)
+
+            # Fase 3: Reconstruir resultados en orden original
+            high_idx = 0
+            low_idx = 0
+            consolidated_descriptions: list[str] = []
+
+            for use_high in use_high_relevance:
+                if use_high:
+                    consolidated_descriptions.append(high_results[high_idx])
+                    high_idx += 1
                 else:
-                    print("impacto.nivel_relevancia: ", impacto.nivel_relevancia)
-        print("all_descriptions: ", all_descriptions)
-        description = consolidate_descriptions(all_descriptions)
+                    consolidated_descriptions.append(low_results[low_idx])
+                    low_idx += 1
 
-    # Actualizar el estado
-    # state.proyectos_ley = proyectos_ley
-    ##state.conflictos = conflictos
-    state.proyecto_ley_impacto = proyecto_ley_impacto
-    state.descripcion_impacto_consolidada = description
+            # Fase 4: Crear objetos ProyectoLeyImpacto
+            for i, proyecto_id in enumerate(proyecto_ids):
+                proyecto = proyectos_impacto[proyecto_id]
+                proyecto_ley_impacto_obj = ProyectoLeyImpacto(
+                    proyecto_id=proyecto["proyecto_id"],
+                    proyecto_titulo=proyecto["proyecto_titulo"],
+                    impactos=proyecto["impactos"],
+                    max_nivel_relevancia=max_relevancia_by_project[i],
+                    descripcion_impacto_consolidada=consolidated_descriptions[i],
+                )
+                proyectos_ley_impacto.append(proyecto_ley_impacto_obj)
+                logger.info(
+                    f"Proyecto {proyecto_id}: {len(proyecto['impactos'])} impactos totales, "
+                    f"{len(high_relevance_by_project[i])} relevantes (>50), "
+                    f"{len(low_relevance_by_project[i])} baja relevancia, "
+                    f"max_relevancia={max_relevancia_by_project[i]}"
+                )
 
-    print("state: ", state)
+    logger.info(
+        f"Procesamiento completado: {len(proyectos_ley_impacto)} proyectos con impacto"
+    )
+    state.proyecto_ley_impacto = proyectos_ley_impacto
     return state

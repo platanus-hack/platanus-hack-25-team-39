@@ -42,8 +42,8 @@ class ConflictoDetectado(BaseModel):
         return f"## Documento Interno de la Empresa:\n\n{self.pagina_texto}\n\nArtículo de ley:\n\n{self.articulo_texto}"
 
 
-class ImpactoConflicto(BaseModel):
-    """Modelo para representar el impacto de un conflicto detectado."""
+class ImpactoConflictoLLM(BaseModel):
+    """Modelo para el output del LLM al analizar un conflicto."""
 
     extracto_interno: str = Field(
         ...,
@@ -65,9 +65,21 @@ class ImpactoConflicto(BaseModel):
     )
 
 
+class ImpactoConflicto(BaseModel):
+    """Modelo completo para representar el impacto de un conflicto detectado."""
+
+    articulo_numero: int
+    extracto_interno: str
+    extracto_articulo: str
+    nivel_relevancia: int
+    descripcion_impacto: str
+
+
 class ProyectoLeyImpacto(BaseModel):
     """Modelo para representar el impacto de un proyecto de ley."""
 
     proyecto_id: str
     proyecto_titulo: str
     impactos: list[ImpactoConflicto]
+    max_nivel_relevancia: int = 0
+    descripcion_impacto_consolidada: str | None = None

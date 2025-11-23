@@ -48,7 +48,12 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-const AUTH_URL = "/.auth/headless";
+// Backend URL from environment variable
+const AUTH_URL = import.meta.env.VITE_BACKEND_URL
+  ? `${import.meta.env.VITE_BACKEND_URL}/.auth/headless`
+  : "/.auth/headless";
+
+console.log('[AllAuth] Using backend URL:', import.meta.env.VITE_BACKEND_URL || 'relative path (development)');
 
 const ANON: Session = {
   authenticated: false,
@@ -81,25 +86,46 @@ export function AllAuthProvider({
   const sessionUrl = `${authUrl}/browser/v1/auth/session`;
 
   const updateSession = useMemo(
-    () => async () =>
-      await fetch(sessionUrl, {
-        credentials: "include",
-      })
-        .then((res) => {
-          if (res.status === 200) {
-            return res.json();
+    () => async () => {
+      try {
+
+        console.log(`[Auth] Verificando sesión en: ${sessionUrl}`);
+        const res = await fetch(sessionUrl, {
+          credentials: "include",
+        });
+        
+        console.log(`[Auth] Respuesta de sesión: status=${res.status}, ok=${res.ok}, contentType=${res.headers.get("content-type")}`);
+        
+        if (res.status === 200) {
+          const contentType = res.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            const text = await res.text();
+            console.error(`[Auth] Respuesta no es JSON. Content-Type: ${contentType}, Body: ${text.substring(0, 200)}`);
+            throw new Error(`Expected JSON but got ${contentType}`);
           }
-          throw new Error("Not authenticated");
-        })
-        .then((data) =>
+
+          const data = await res.json();
+          console.log(`[Auth] Datos de sesión recibidos:`, data);
           setSession({
             ...data,
             authenticated: true,
-          })
-        )
-        .catch(() => {
+          });
+        } else if (res.status === 401) {
+          // 401 is expected when not authenticated
+          console.log(`[Auth] No active session (401 - not authenticated)`);
           setSession(ANON);
-        }),
+        } else {
+          const errorText = await res.text().catch(() => "No se pudo leer el error");
+          console.warn(`[Auth] Session check failed with status ${res.status}:`, errorText);
+          setSession(ANON);
+          throw new Error(`Session check failed: ${res.status} ${errorText}`);
+        }
+      } catch (error) {
+        console.error("[Auth] Error fetching session:", error);
+        setSession(ANON);
+        throw error;
+      }
+    },
     [sessionUrl]
   );
 
@@ -120,7 +146,7 @@ export function AllAuthProvider({
 
   useEffect(() => {
     Promise.allSettled([
-      fetch(configUrl).then((res) => res.json()),
+      fetch(configUrl, { credentials: "include" }).then((res) => res.json()),
       updateSession(),
     ]).then((results) => {
       const configResult = results[0];
@@ -146,6 +172,10 @@ export function AllAuthProvider({
             login: (email: string, password: string) =>
               fetch(`${authUrl}/browser/v1/auth/login`, {
                 method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                credentials: "include",
                 body: JSON.stringify({ email, password }),
               }).then((res) => res.json()),
           },

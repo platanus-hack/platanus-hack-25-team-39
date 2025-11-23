@@ -1,0 +1,18 @@
+{
+  "id": "17368-05",
+  "titulo": "Establece subsidio a la tasa de interés del Crédito Hipotecario de Viviendas Nuevas y modifica normas que indica",
+  "camara_origen": "Cámara de Diputados",
+  "tipo_proyecto": "Proyecto de Ley",
+  "etapa": 1,
+  "urgencia_actual": "Sin urgencia",
+  "fecha": "2025-05-19",
+  "articulos": [
+    {
+      "numero": 1,
+      "tipo": "permanente",
+      "texto": "Artículo 1.- Subsidio a la tasa de interés del Crédito Hipotecario de Viviendas Nuevas. Establécese un subsidio de hasta sesenta puntos básicos (60pb) sobre la tasa de interés para créditos hipotecarios, el cual será asignado de manera simultánea a las Garantías Apoyo a la vivienda Nueva establecidas en el artículo sexto transitorio de la ley N° 21.543, que crea un Fondo de Garantías Especiales, y se regirá por las reglas que se señalan a continuación y por las demás normas de aplicación general contempladas en uno o más decretos del Ministerio de Hacienda dictados bajo la fórmula 'Por orden del Presidente de la República'. Los financiamientos beneficiados por el subsidio deberán destinarse exclusivamente al pago de viviendas nuevas que cumplan con los requisitos indicados en este artículo, y la totalidad del subsidio deberá destinarse exclusivamente al pago de viviendas nuevas que cumplan con los requisitos indicados en este artículo.",
+      "descripcion_semantica": "Creación de subsidio de 60 puntos básicos para tasa de interés de créditos hipotecarios para viviendas nuevas vinculado al Fondo de Garantías Especiales de la ley 21.543"
+    }
+  ]
+}
+

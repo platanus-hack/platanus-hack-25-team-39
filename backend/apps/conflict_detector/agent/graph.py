@@ -2,7 +2,7 @@
 
 from langgraph.graph import StateGraph
 
-from .models import ConflictoDetectado
+from .models import ConflictoDetectado, ProyectoLeyImpacto
 from .nodes import process_document
 from .state import ConflictDetectorState
 
@@ -55,7 +55,7 @@ def format_conflictos_output(conflictos: list[ConflictoDetectado]) -> dict:
     return resultado
 
 
-def run_agent(document_pages: list[str]) -> dict:
+def run_agent(document_pages: list[str]) -> list[ProyectoLeyImpacto]:
     """
     Ejecuta el agente con las páginas del documento.
 
@@ -63,11 +63,11 @@ def run_agent(document_pages: list[str]) -> dict:
         document_pages: Lista con el texto de cada página del documento
 
     Returns:
-        Diccionario con resultado y conflictos formateados
+        Lista de ProyectoLeyImpacto con los impactos detectados
     """
     agent = create_agent()
     initial_state = ConflictDetectorState(document_pages=document_pages)
     result = agent.invoke(initial_state)
-    print("result: ", result)
 
-    return result
+    # LangGraph retorna un diccionario, no el modelo Pydantic
+    return result["proyecto_ley_impacto"]

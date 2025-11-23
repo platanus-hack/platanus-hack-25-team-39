@@ -1,5 +1,5 @@
 # Local Docker Compose deployment
-export COMPOSE_PROJECT_NAME := "legal-ward"
+export COMPOSE_PROJECT_NAME := "test-legar-ward"
 set dotenv-load := true
 
 # Default recipe - show available commands

@@ -14,9 +14,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTrackingRouteImport } from './routes/_authenticated/tracking'
-import { Route as AuthenticatedTab3RouteImport } from './routes/_authenticated/tab3'
-import { Route as AuthenticatedTab2RouteImport } from './routes/_authenticated/tab2'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDocumentsRouteImport } from './routes/_authenticated/documents'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedDiscoveriesIndexRouteImport } from './routes/_authenticated/discoveries.index'
@@ -44,21 +41,6 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedTrackingRoute = AuthenticatedTrackingRouteImport.update({
   id: '/tracking',
   path: '/tracking',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedTab3Route = AuthenticatedTab3RouteImport.update({
-  id: '/tab3',
-  path: '/tab3',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedTab2Route = AuthenticatedTab2RouteImport.update({
-  id: '/tab2',
-  path: '/tab2',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDocumentsRoute = AuthenticatedDocumentsRouteImport.update({
@@ -89,9 +71,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/login-callback': typeof LoginCallbackRoute
   '/documents': typeof AuthenticatedDocumentsRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/tab2': typeof AuthenticatedTab2Route
-  '/tab3': typeof AuthenticatedTab3Route
   '/tracking': typeof AuthenticatedTrackingRoute
   '/': typeof AuthenticatedIndexRoute
   '/discoveries/$id': typeof AuthenticatedDiscoveriesIdRoute
@@ -102,9 +81,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/login-callback': typeof LoginCallbackRoute
   '/documents': typeof AuthenticatedDocumentsRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/tab2': typeof AuthenticatedTab2Route
-  '/tab3': typeof AuthenticatedTab3Route
   '/tracking': typeof AuthenticatedTrackingRoute
   '/': typeof AuthenticatedIndexRoute
   '/discoveries/$id': typeof AuthenticatedDiscoveriesIdRoute
@@ -117,9 +93,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/login-callback': typeof LoginCallbackRoute
   '/_authenticated/documents': typeof AuthenticatedDocumentsRoute
-  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
-  '/_authenticated/tab2': typeof AuthenticatedTab2Route
-  '/_authenticated/tab3': typeof AuthenticatedTab3Route
   '/_authenticated/tracking': typeof AuthenticatedTrackingRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discoveries/$id': typeof AuthenticatedDiscoveriesIdRoute
@@ -132,9 +105,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/login-callback'
     | '/documents'
-    | '/settings'
-    | '/tab2'
-    | '/tab3'
     | '/tracking'
     | '/'
     | '/discoveries/$id'
@@ -145,9 +115,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/login-callback'
     | '/documents'
-    | '/settings'
-    | '/tab2'
-    | '/tab3'
     | '/tracking'
     | '/'
     | '/discoveries/$id'
@@ -159,9 +126,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/login-callback'
     | '/_authenticated/documents'
-    | '/_authenticated/settings'
-    | '/_authenticated/tab2'
-    | '/_authenticated/tab3'
     | '/_authenticated/tracking'
     | '/_authenticated/'
     | '/_authenticated/discoveries/$id'
@@ -212,27 +176,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTrackingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/tab3': {
-      id: '/_authenticated/tab3'
-      path: '/tab3'
-      fullPath: '/tab3'
-      preLoaderRoute: typeof AuthenticatedTab3RouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/tab2': {
-      id: '/_authenticated/tab2'
-      path: '/tab2'
-      fullPath: '/tab2'
-      preLoaderRoute: typeof AuthenticatedTab2RouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/documents': {
       id: '/_authenticated/documents'
       path: '/documents'
@@ -266,9 +209,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRoute
-  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedTab2Route: typeof AuthenticatedTab2Route
-  AuthenticatedTab3Route: typeof AuthenticatedTab3Route
   AuthenticatedTrackingRoute: typeof AuthenticatedTrackingRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedDiscoveriesIdRoute: typeof AuthenticatedDiscoveriesIdRoute
@@ -278,9 +218,6 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDocumentsRoute: AuthenticatedDocumentsRoute,
-  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedTab2Route: AuthenticatedTab2Route,
-  AuthenticatedTab3Route: AuthenticatedTab3Route,
   AuthenticatedTrackingRoute: AuthenticatedTrackingRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedDiscoveriesIdRoute: AuthenticatedDiscoveriesIdRoute,

@@ -4,7 +4,6 @@ Production-ready Django settings file.
 For local development, use .default file to override necessary settings.
 """
 
-import os
 from pathlib import Path
 
 import dj_database_url
@@ -15,20 +14,6 @@ from uncouple import Config, StringList
 #############################
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 APPS_DIR = BASE_DIR / "apps"
-
-# Load .env file manually to ensure decouple can find the variables
-_env_file = BASE_DIR / ".env"
-if _env_file.exists():
-    with open(_env_file) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                key = key.strip()
-                value = value.strip().strip("'\"")  # Remove quotes if present
-                # Only set if not already in environment (env vars take precedence)
-                if key not in os.environ:
-                    os.environ[key] = value
 
 
 #############################
@@ -177,6 +162,7 @@ INSTALLED_APPS = [
     ############################
     "apps.users",
     "apps.auditlog",
+    "apps.proyectos_ley",
     "apps.conflict_detector",
 ]
 

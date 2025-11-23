@@ -1,0 +1,17 @@
+# Railway configuration for Frontend service
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "/frontend/docker/Dockerfile"
+
+[deploy]
+startCommand = "serve -s dist -l 3000"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.healthcheck]
+path = "/"
+port = 3000
+
+# Watch only frontend directory to avoid rebuilds on backend changes
+watchPatterns = ["/frontend/**"]
