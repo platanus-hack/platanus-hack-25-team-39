@@ -140,13 +140,23 @@ just migrate
 
 ### Credenciales de Prueba
 
+#### Local
 Desde la carpeta local
-
 ```
 just createsuperuser
 ```
 
-crea una cuenta con un formato mail valido y contraseña.
+#### Producción
+
+Usa cualquiera de estas cuentas:
+
+| Email | Contraseña |
+|-------|------------|
+| test1@legalward.com | testinguser |
+| test2@legalward.com | testinguser |
+| test3@legalward.com | testinguser |
+| test4@legalward.com | testinguser |
+| test5@legalward.com | testinguser |
 
 ## Cómo Funciona
 
