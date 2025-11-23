@@ -140,15 +140,13 @@ just migrate
 
 ### Credenciales de Prueba
 
-Usa cualquiera de estas cuentas:
+Desde la carpeta local
 
-| Email | Contraseña |
-|-------|------------|
-| test1@legalward.com | testinguser |
-| test2@legalward.com | testinguser |
-| test3@legalward.com | testinguser |
-| test4@legalward.com | testinguser |
-| test5@legalward.com | testinguser |
+```
+just createsuperuser
+```
+
+crea una cuenta con un formato mail valido y contraseña.
 
 ## Cómo Funciona
 
